@@ -13,7 +13,7 @@ const PatientFormPage = () => {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
-  const { canAccessPath } = useAuth();
+  const { canAccessPath, isAdmin } = useAuth();
 
   useEffect(() => {
     if (!canAccessPath('/patients')) {
@@ -26,14 +26,36 @@ const PatientFormPage = () => {
     date_of_birth: '',
     medical_notes: '',
     photo_url: '',
+    caregiver_id: '',
   });
+  const [caregivers, setCaregivers] = useState([]);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
-  const [loading, setLoading] = useState(isEdit);
+  const [loading, setLoading] = useState(isEdit || isAdmin);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      if (!isEdit) setLoading(false);
+      return;
+    }
+
+    const fetchCaregivers = async () => {
+      try {
+        const { data } = await api.get('/api/users');
+        setCaregivers(data.filter((u) => u.role === 'caregiver'));
+      } catch (err) {
+        setApiError(err.response?.data?.error || 'Failed to load caregivers');
+      } finally {
+        if (!isEdit) setLoading(false);
+      }
+    };
+
+    fetchCaregivers();
+  }, [isAdmin, isEdit]);
 
   useEffect(() => {
     if (!isEdit) return;
@@ -46,6 +68,7 @@ const PatientFormPage = () => {
           date_of_birth: data.date_of_birth || '',
           medical_notes: data.medical_notes || '',
           photo_url: data.photo_url || '',
+          caregiver_id: data.caregiver_id || '',
         });
       } catch (err) {
         setApiError(err.response?.data?.error || 'Failed to load patient');
@@ -101,6 +124,9 @@ const PatientFormPage = () => {
   const validate = () => {
     const newErrors = {};
     if (!form.name.trim()) newErrors.name = 'Name is required';
+    if (isAdmin && !form.caregiver_id) {
+      newErrors.caregiver_id = 'Caregiver is required';
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -132,6 +158,10 @@ const PatientFormPage = () => {
         medical_notes: form.medical_notes || null,
         photo_url: photoUrl || null,
       };
+
+      if (isAdmin) {
+        payload.caregiver_id = form.caregiver_id;
+      }
 
       if (isEdit) {
         await api.put(`/api/patients/${id}`, payload);
@@ -185,6 +215,28 @@ const PatientFormPage = () => {
             />
             {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
           </div>
+
+          {isAdmin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Caregiver *</label>
+              <select
+                name="caregiver_id"
+                value={form.caregiver_id}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a caregiver</option>
+                {caregivers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              {errors.caregiver_id && (
+                <p className="mt-1 text-sm text-red-600">{errors.caregiver_id}</p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
