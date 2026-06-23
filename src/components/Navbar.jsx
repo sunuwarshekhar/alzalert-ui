@@ -1,17 +1,17 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const navLinks = [
-  { path: '/dashboard', label: 'Dashboard' },
-  { path: '/patients', label: 'Patients' },
-  { path: '/alerts', label: 'Alerts' },
-  { path: '/users', label: 'Users' },
+  { path: "/dashboard", label: "Dashboard" },
+  { path: "/patients", label: "Patients" },
+  { path: "/alerts", label: "Alerts" },
+  { path: "/users", label: "Users" },
 ];
 
 const roleBadgeColor = {
-  admin: 'bg-purple-100 text-purple-800',
-  caregiver: 'bg-blue-100 text-blue-800',
-  community: 'bg-green-100 text-green-800',
+  admin: "bg-purple-100 text-purple-800",
+  caregiver: "bg-blue-100 text-blue-800",
+  community: "bg-green-100 text-green-800",
 };
 
 const Navbar = () => {
@@ -20,7 +20,7 @@ const Navbar = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const visibleLinks = navLinks.filter((link) => canAccessPath(link.path));
@@ -46,12 +46,7 @@ const Navbar = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-700">{user?.name}</span>
-            <span
-              className={`text-xs font-medium px-2 py-1 rounded-full capitalize ${roleBadgeColor[user?.role] || 'bg-gray-100 text-gray-800'}`}
-            >
-              {user?.role}
-            </span>
+            <span className="text-sm text-gray-700">Welcome {user?.name}</span>
             <button
               onClick={handleLogout}
               className="text-sm font-medium text-gray-600 hover:text-red-600 transition-colors"

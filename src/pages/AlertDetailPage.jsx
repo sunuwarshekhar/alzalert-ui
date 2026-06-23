@@ -6,6 +6,9 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import InitialsAvatar from '../components/InitialsAvatar';
 import { useAuth } from '../context/AuthContext';
+import { MAX_IMAGE_SIZE, uploadImage } from '../utils/uploadImage';
+
+const MAX_SIGHTING_IMAGES = 3;
 
 const AlertDetailPage = () => {
   const { id } = useParams();
@@ -13,9 +16,12 @@ const AlertDetailPage = () => {
   const [alert, setAlert] = useState(null);
   const [sightings, setSightings] = useState([]);
   const [form, setForm] = useState({ location_text: '', notes: '' });
+  const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
@@ -42,8 +48,59 @@ const AlertDetailPage = () => {
   const validate = () => {
     const newErrors = {};
     if (!form.location_text.trim()) newErrors.location_text = 'Location is required';
+    if (imageFiles.length > MAX_SIGHTING_IMAGES) {
+      newErrors.images = `You can upload at most ${MAX_SIGHTING_IMAGES} images`;
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleImageChange = (e) => {
+    const selected = Array.from(e.target.files || []);
+    e.target.value = '';
+
+    if (!selected.length) return;
+
+    const remaining = MAX_SIGHTING_IMAGES - imageFiles.length;
+    if (remaining <= 0) {
+      setErrors({ ...errors, images: `You can upload at most ${MAX_SIGHTING_IMAGES} images` });
+      return;
+    }
+
+    const nextFiles = [];
+    const nextPreviews = [];
+
+    for (const file of selected.slice(0, remaining)) {
+      if (!file.type.startsWith('image/')) {
+        setErrors({ ...errors, images: 'Please select image files only' });
+        return;
+      }
+      if (file.size > MAX_IMAGE_SIZE) {
+        setErrors({ ...errors, images: 'Each image must be under 5MB' });
+        return;
+      }
+      nextFiles.push(file);
+      nextPreviews.push(URL.createObjectURL(file));
+    }
+
+    setErrors({ ...errors, images: '' });
+    setImageFiles([...imageFiles, ...nextFiles]);
+    setImagePreviews([...imagePreviews, ...nextPreviews]);
+  };
+
+  const removeImage = (index) => {
+    URL.revokeObjectURL(imagePreviews[index]);
+    setImageFiles(imageFiles.filter((_, i) => i !== index));
+    setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+    setErrors({ ...errors, images: '' });
+  };
+
+  const resetSightingForm = () => {
+    imagePreviews.forEach((url) => URL.revokeObjectURL(url));
+    setForm({ location_text: '', notes: '' });
+    setImageFiles([]);
+    setImagePreviews([]);
+    setErrors({});
   };
 
   const handleSubmit = async (e) => {
@@ -53,13 +110,28 @@ const AlertDetailPage = () => {
 
     setSubmitting(true);
     try {
+      let imageUrls = [];
+
+      if (imageFiles.length > 0) {
+        setUploading(true);
+        try {
+          imageUrls = await Promise.all(imageFiles.map((file) => uploadImage(file)));
+        } catch {
+          setFormError('Image upload failed. Please try again.');
+          return;
+        } finally {
+          setUploading(false);
+        }
+      }
+
       const { data } = await api.post('/api/sightings', {
         alert_id: id,
         location_text: form.location_text,
         notes: form.notes,
+        image_urls: imageUrls,
       });
       setSightings([data, ...sightings]);
-      setForm({ location_text: '', notes: '' });
+      resetSightingForm();
     } catch (err) {
       setFormError(err.response?.data?.error || 'Failed to add sighting');
     } finally {
@@ -154,8 +226,8 @@ const AlertDetailPage = () => {
                   {alert.status}
                 </span>
                 <p className="text-gray-600 mt-2">
-                  <span className="font-medium">Last seen:</span>{' '}
-                  {alert.last_seen_location || 'Unknown'}
+                  <span className="font-medium">Description:</span>{' '}
+                  {alert.description || 'No description provided'}
                 </p>
                 <p className="text-gray-500 text-sm mt-1">
                   Alert created {formatDate(alert.created_at)}
@@ -192,6 +264,25 @@ const AlertDetailPage = () => {
                       <p className="font-medium text-gray-900">{sighting.location_text}</p>
                       {sighting.notes && (
                         <p className="text-gray-600 text-sm mt-1">{sighting.notes}</p>
+                      )}
+                      {sighting.image_urls?.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {sighting.image_urls.map((url, index) => (
+                            <a
+                              key={`${sighting.id}-${index}`}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block"
+                            >
+                              <img
+                                src={url}
+                                alt={`Sighting ${index + 1}`}
+                                className="h-20 w-20 rounded-md object-cover border border-gray-200 hover:opacity-90"
+                              />
+                            </a>
+                          ))}
+                        </div>
                       )}
                       <p className="text-gray-400 text-xs mt-1">
                         Reported by {sighting.reporter?.name || 'Unknown'} &middot;{' '}
@@ -241,14 +332,55 @@ const AlertDetailPage = () => {
                   placeholder="Additional details..."
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Photos (optional, up to {MAX_SIGHTING_IMAGES})
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Upload images of the person or location where they were last seen.
+                </p>
+                {imagePreviews.length > 0 && (
+                  <div className="flex flex-wrap gap-3 mb-3">
+                    {imagePreviews.map((preview, index) => (
+                      <div key={preview} className="relative">
+                        <img
+                          src={preview}
+                          alt={`Upload preview ${index + 1}`}
+                          className="h-20 w-20 rounded-md object-cover border border-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white text-xs leading-none hover:bg-red-700"
+                          aria-label="Remove image"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {imageFiles.length < MAX_SIGHTING_IMAGES && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageChange}
+                    className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                )}
+                {errors.images && (
+                  <p className="mt-1 text-sm text-red-600">{errors.images}</p>
+                )}
+              </div>
               <ErrorMessage message={formError} />
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || uploading}
                 className="flex items-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
-                {submitting && <LoadingSpinner size="sm" />}
-                Submit Sighting
+                {(submitting || uploading) && <LoadingSpinner size="sm" />}
+                {uploading ? 'Uploading images...' : 'Submit Sighting'}
               </button>
             </form>
           </div>

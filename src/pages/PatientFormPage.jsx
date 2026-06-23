@@ -108,14 +108,20 @@ const PatientFormPage = () => {
       params: { filename: file.name, type: file.type },
     });
 
-    const response = await fetch(data.uploadUrl, {
-      method: 'PUT',
-      body: file,
-      headers: { 'Content-Type': file.type },
-    });
+    if (data.method === 'POST') {
+      const form = new FormData();
+      form.append('file', file);
+      await api.post(data.uploadUrl, form);
+    } else {
+      const response = await fetch(data.uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to upload photo to S3');
+      if (!response.ok) {
+        throw new Error('Failed to upload photo');
+      }
     }
 
     return data.fileUrl;

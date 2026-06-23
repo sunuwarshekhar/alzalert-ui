@@ -4,6 +4,7 @@ import api from '../api';
 import Navbar from '../components/Navbar';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
+import InitialsAvatar from '../components/InitialsAvatar';
 import { useAuth } from '../context/AuthContext';
 
 const StatusBadge = ({ status }) => (
@@ -24,7 +25,7 @@ const AlertsPage = () => {
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({ patient_id: '', last_seen_location: '' });
+  const [form, setForm] = useState({ patient_id: '', description: '' });
   const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
@@ -57,7 +58,7 @@ const AlertsPage = () => {
   const validate = () => {
     const newErrors = {};
     if (!form.patient_id) newErrors.patient_id = 'Patient is required';
-    if (!form.last_seen_location.trim()) newErrors.last_seen_location = 'Last seen location is required';
+    if (!form.description.trim()) newErrors.description = 'Description is required';
     setFormErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -70,7 +71,7 @@ const AlertsPage = () => {
     try {
       const { data } = await api.post('/api/alerts', form);
       setAlerts([data, ...alerts]);
-      setForm({ patient_id: '', last_seen_location: '' });
+      setForm({ patient_id: '', description: '' });
       setShowForm(false);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create alert');
@@ -121,16 +122,17 @@ const AlertsPage = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Last Seen Location *
+                  Description *
                 </label>
-                <input
-                  value={form.last_seen_location}
-                  onChange={(e) => setForm({ ...form, last_seen_location: e.target.value })}
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g. Thamel, Kathmandu"
+                  placeholder="Describe the situation, last known location, clothing, etc."
                 />
-                {formErrors.last_seen_location && (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.last_seen_location}</p>
+                {formErrors.description && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.description}</p>
                 )}
               </div>
             </div>
@@ -154,47 +156,45 @@ const AlertsPage = () => {
         <ErrorMessage message={error} />
 
         {!loading && !error && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <>
             {alerts.length === 0 ? (
-              <p className="px-6 py-8 text-gray-500 text-center">No alerts found</p>
+              <div className="bg-white rounded-lg shadow px-6 py-8">
+                <p className="text-gray-500 text-center">No alerts found</p>
+              </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-600">
-                    <tr>
-                      <th className="px-6 py-3 text-left font-medium">Patient</th>
-                      <th className="px-6 py-3 text-left font-medium">Status</th>
-                      <th className="px-6 py-3 text-left font-medium">Last Seen</th>
-                      <th className="px-6 py-3 text-left font-medium">Created</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {alerts.map((alert) => (
-                      <tr key={alert.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <Link
-                            to={`/alerts/${alert.id}`}
-                            className="text-blue-600 hover:underline font-medium"
-                          >
-                            {alert.patient?.name || 'Unknown'}
-                          </Link>
-                        </td>
-                        <td className="px-6 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {alerts.map((alert) => (
+                  <Link
+                    key={alert.id}
+                    to={`/alerts/${alert.id}`}
+                    className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-5 flex flex-col"
+                  >
+                    <div className="flex items-start gap-4">
+                      <InitialsAvatar
+                        name={alert.patient?.name}
+                        photoUrl={alert.patient?.photo_url}
+                        size={64}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-lg font-semibold text-gray-900 truncate">
+                          {alert.patient?.name || 'Unknown'}
+                        </h2>
+                        <div className="mt-1">
                           <StatusBadge status={alert.status} />
-                        </td>
-                        <td className="px-6 py-4 text-gray-700">
-                          {alert.last_seen_location || '—'}
-                        </td>
-                        <td className="px-6 py-4 text-gray-500">
-                          {formatDate(alert.created_at)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                      </div>
+                    </div>
+                    {alert.description && (
+                      <p className="mt-3 text-sm text-gray-600 line-clamp-3">{alert.description}</p>
+                    )}
+                    <p className="mt-auto pt-3 text-xs text-gray-500">
+                      Created {formatDate(alert.created_at)}
+                    </p>
+                  </Link>
+                ))}
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>

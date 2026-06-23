@@ -4,6 +4,7 @@ import api from '../api';
 import Navbar from '../components/Navbar';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
+import InitialsAvatar from '../components/InitialsAvatar';
 import { useAuth } from '../context/AuthContext';
 
 const DashboardPage = () => {
@@ -52,12 +53,10 @@ const DashboardPage = () => {
   ).length;
 
   const formatDate = (date) =>
-    new Date(date).toLocaleString('en-US', {
+    new Date(date).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
     });
 
   return (
@@ -93,43 +92,43 @@ const DashboardPage = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Active Alerts</h2>
-              </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Active Alerts</h2>
               {activeAlerts.length === 0 ? (
-                <p className="px-6 py-8 text-gray-500 text-center">No active alerts</p>
+                <div className="bg-white rounded-lg shadow px-6 py-8">
+                  <p className="text-gray-500 text-center">No active alerts</p>
+                </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-gray-600">
-                      <tr>
-                        <th className="px-6 py-3 text-left font-medium">Patient</th>
-                        <th className="px-6 py-3 text-left font-medium">Last Seen</th>
-                        <th className="px-6 py-3 text-left font-medium">Created</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {activeAlerts.map((alert) => (
-                        <tr key={alert.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4">
-                            <Link
-                              to={`/alerts/${alert.id}`}
-                              className="text-blue-600 hover:underline font-medium"
-                            >
-                              {alert.patient?.name || 'Unknown'}
-                            </Link>
-                          </td>
-                          <td className="px-6 py-4 text-gray-700">
-                            {alert.last_seen_location || '—'}
-                          </td>
-                          <td className="px-6 py-4 text-gray-500">
-                            {formatDate(alert.created_at)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {activeAlerts.map((alert) => (
+                    <Link
+                      key={alert.id}
+                      to={`/alerts/${alert.id}`}
+                      className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-5 flex flex-col"
+                    >
+                      <div className="flex items-start gap-4">
+                        <InitialsAvatar
+                          name={alert.patient?.name}
+                          photoUrl={alert.patient?.photo_url}
+                          size={64}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 truncate">
+                            {alert.patient?.name || 'Unknown'}
+                          </h3>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize mt-1 bg-red-100 text-red-800">
+                            active
+                          </span>
+                        </div>
+                      </div>
+                      {alert.description && (
+                        <p className="mt-3 text-sm text-gray-600 line-clamp-3">{alert.description}</p>
+                      )}
+                      <p className="mt-auto pt-3 text-xs text-gray-500">
+                        Created {formatDate(alert.created_at)}
+                      </p>
+                    </Link>
+                  ))}
                 </div>
               )}
             </div>
